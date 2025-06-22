@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ super() }}{% endblock %}
+{% block page_title %}Dashboard del Sistema{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-box text-primary" style="font-size: 3rem;"></i>
+                <h3 class="mt-2" id="totalActivos">-</h3>
+                <p class="text-muted">Total Activos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                <h3 class="mt-2" id="activosActivos">-</h3>
+                <p class="text-muted">Activos Activos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-geo-alt text-warning" style="font-size: 3rem;"></i>
+                <h3 class="mt-2" id="sinUbicacion">-</h3>
+                <p class="text-muted">Sin Ubicación</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-clipboard-check text-info" style="font-size: 3rem;"></i>
+                <h3 class="mt-2" id="auditoriasPendientes">-</h3>
+                <p class="text-muted">Auditorías Pendientes</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-table me-2"></i>Activos Recientes</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activosRecientes">
+                            <tr>
+                                <td colspan="4" class="text-center">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-pie-chart me-2"></i>Distribución por Estado</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
+
+async function loadDashboardData() {
+    try {
+        const response = await fetch('/api/reportes/dashboard');
+        const data = await response.json();
+        
+        document.getElementById('totalActivos').textContent = data.total_activos;
+        document.getElementById('activosActivos').textContent = data.activos_por_status['Activo'] || 0;
+        document.getElementById('sinUbicacion').textContent = data.activos_sin_ubicacion;
+        document.getElementById('auditoriasPendientes').textContent = data.auditorias_pendientes;
+        
+        createStatusChart(data.activos_por_status);
+        loadRecentAssets();
+        
+    } catch (error) {
+        console.error('Error cargando datos:', error);
+    }
+}
+
+function createStatusChart(statusData) {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(statusData),
+            datasets: [{
+                data: Object.values(statusData),
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6c757d']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+async function loadRecentAssets() {
+    try {
+        const response = await fetch('/api/activos?per_page=5');
+        const data = await response.json();
+        
+        const tbody = document.getElementById('activosRecientes');
+        tbody.innerHTML = '';
+        
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(activo => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${activo.codigo_activo}</strong></td>
+                    <td>${activo.nombre_activo}</td>
+                    <td><span class="badge bg-success">${activo.status}</span></td>
+                    <td>
+                        <a href="/activo/${activo.codigo_activo}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No hay activos registrados</td></tr>';
+        }
+        
+    } catch (error) {
+        console.error('Error cargando activos:', error);
+    }
+}
+</script>
+{% endblock %}

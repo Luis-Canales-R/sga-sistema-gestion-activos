@@ -1,0 +1,104 @@
+{% extends "mobile/base.html" %}
+
+{% block title %}Scanner QR - SGA Móvil{% endblock %}
+{% block page_title %}Scanner QR{% endblock %}
+{% block page_subtitle %}Escanea códigos de activos{% endblock %}
+
+{% block content %}
+<div class="card-mobile mb-4">
+    <div class="card-body text-center">
+        <h5>Simulador de Scanner QR</h5>
+        <p class="text-muted">En un entorno real, aquí se activaría la cámara</p>
+        <div class="p-4 bg-light rounded mb-3">
+            <i class="bi bi-camera" style="font-size: 4rem; color: #ccc;"></i>
+        </div>
+        <input type="text" class="form-control mb-3" placeholder="Ingresa código de activo manualmente" id="codigoManual">
+        <button class="btn btn-primary" onclick="simularEscaneo()">
+            <i class="bi bi-search me-2"></i>Buscar Activo
+        </button>
+    </div>
+</div>
+
+<div id="resultadoEscaneo" style="display: none;" class="card-mobile">
+    <div class="card-body">
+        <h6 class="text-success">
+            <i class="bi bi-check-circle me-2"></i>Activo Encontrado
+        </h6>
+        <div id="infoActivo"></div>
+        <div class="mt-3">
+            <button class="btn btn-primary btn-sm me-2" onclick="verDetalles()">Ver Detalles</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="continuarEscaneo()">Continuar</button>
+        </div>
+    </div>
+</div>
+
+<h6 class="mb-3">Instrucciones</h6>
+<div class="card-mobile">
+    <div class="card-body">
+        <ul class="mb-0">
+            <li>Apunta la cámara al código QR del activo</li>
+            <li>Mantén el dispositivo estable</li>
+            <li>Asegúrate de tener buena iluminación</li>
+            <li>El escaneo se realizará automáticamente</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activoActual = null;
+
+async function simularEscaneo() {
+    const codigo = document.getElementById('codigoManual').value.trim();
+    if (!codigo) {
+        alert('Ingresa un código de activo');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/buscar?q=${encodeURIComponent(codigo)}`);
+        const data = await response.json();
+        
+        if (data.activos && data.activos.length > 0) {
+            activoActual = data.activos[0];
+            mostrarResultado(activoActual);
+        } else {
+            alert('Activo no encontrado');
+        }
+        
+    } catch (error) {
+        console.error('Error buscando activo:', error);
+        alert('Error al buscar el activo');
+    }
+}
+
+function mostrarResultado(activo) {
+    const infoDiv = document.getElementById('infoActivo');
+    infoDiv.innerHTML = `
+        <div class="mb-2">
+            <strong>${activo.codigo_activo}</strong>
+        </div>
+        <div class="text-muted mb-2">${activo.nombre_activo}</div>
+        <div class="small">
+            <div><strong>Estado:</strong> ${activo.status}</div>
+            <div><strong>Marca:</strong> ${activo.marca || 'N/A'}</div>
+        </div>
+    `;
+    
+    document.getElementById('resultadoEscaneo').style.display = 'block';
+}
+
+function verDetalles() {
+    if (activoActual) {
+        window.location.href = `/activo/${activoActual.codigo_activo}`;
+    }
+}
+
+function continuarEscaneo() {
+    document.getElementById('resultadoEscaneo').style.display = 'none';
+    document.getElementById('codigoManual').value = '';
+    activoActual = null;
+}
+</script>
+{% endblock %}

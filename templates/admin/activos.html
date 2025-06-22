@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Activos - {{ super() }}{% endblock %}
+{% block page_title %}Gestión de Activos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Gestión de Activos</h2>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevoActivo">
+        <i class="bi bi-plus-circle me-1"></i>Nuevo Activo
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="row">
+            <div class="col-md-6">
+                <input type="text" class="form-control" placeholder="Buscar activos..." id="searchActivos">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtroEstado">
+                    <option value="">Todos los estados</option>
+                    {% for status in asset_statuses %}
+                    <option value="{{ status }}">{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary" onclick="aplicarFiltros()">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Código</th>
+                        <th>Nombre</th>
+                        <th>Marca/Modelo</th>
+                        <th>Estado</th>
+                        <th>Ubicación</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaActivos">
+                    <tr>
+                        <td colspan="6" class="text-center py-4">Cargando activos...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Activo -->
+<div class="modal fade" id="modalNuevoActivo" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Activo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formActivo">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Código de Activo *</label>
+                            <input type="text" class="form-control" id="codigoActivo" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre del Activo *</label>
+                            <input type="text" class="form-control" id="nombreActivo" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Descripción</label>
+                            <textarea class="form-control" id="descripcionActivo" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Marca</label>
+                            <input type="text" class="form-control" id="marcaActivo">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Modelo</label>
+                            <input type="text" class="form-control" id="modeloActivo">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Número de Serie</label>
+                            <input type="text" class="form-control" id="numeroSerie">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" id="estadoActivo">
+                                {% for status in asset_statuses %}
+                                <option value="{{ status }}">{{ status }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de Adquisición *</label>
+                            <input type="date" class="form-control" id="fechaAdquisicion" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Costo de Adquisición *</label>
+                            <input type="number" class="form-control" id="costoAdquisicion" step="0.01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Vida Útil (meses)</label>
+                            <input type="number" class="form-control" id="vidaUtil" value="36">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Activo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    cargarActivos();
+    
+    document.getElementById('searchActivos').addEventListener('input', 
+        debounce(aplicarFiltros, 300));
+});
+
+async function cargarActivos() {
+    try {
+        const search = document.getElementById('searchActivos').value;
+        const estado = document.getElementById('filtroEstado').value;
+        
+        let url = '/api/activos?';
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+        if (estado) url += `status=${encodeURIComponent(estado)}&`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        renderTablaActivos(data.items);
+        
+    } catch (error) {
+        console.error('Error cargando activos:', error);
+    }
+}
+
+function renderTablaActivos(activos) {
+    const tbody = document.getElementById('tablaActivos');
+    tbody.innerHTML = '';
+    
+    if (activos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No se encontraron activos</td></tr>';
+        return;
+    }
+    
+    activos.forEach(activo => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${activo.codigo_activo}</strong></td>
+            <td>${activo.nombre_activo}</td>
+            <td>${activo.marca || 'N/A'} ${activo.modelo || ''}</td>
+            <td><span class="badge bg-success">${activo.status}</span></td>
+            <td>${activo.ubicacion?.nombre || 'Sin ubicar'}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="verActivo('${activo.codigo_activo}')">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-info" onclick="generarQR(${activo.id})">
+                        <i class="bi bi-qr-code"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function aplicarFiltros() {
+    cargarActivos();
+}
+
+document.getElementById('formActivo').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const activo = {
+        codigo_activo: document.getElementById('codigoActivo').value,
+        nombre_activo: document.getElementById('nombreActivo').value,
+        descripcion: document.getElementById('descripcionActivo').value,
+        marca: document.getElementById('marcaActivo').value,
+        modelo: document.getElementById('modeloActivo').value,
+        numero_serie: document.getElementById('numeroSerie').value,
+        status: document.getElementById('estadoActivo').value,
+        fecha_adquisicion: document.getElementById('fechaAdquisicion').value,
+        costo_adquisicion: parseFloat(document.getElementById('costoAdquisicion').value),
+        vida_util_meses: parseInt(document.getElementById('vidaUtil').value)
+    };
+    
+    try {
+        const response = await fetch('/api/activos', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(activo)
+        });
+        
+        if (response.ok) {
+            alert('Activo creado exitosamente');
+            bootstrap.Modal.getInstance(document.getElementById('modalNuevoActivo')).hide();
+            cargarActivos();
+            document.getElementById('formActivo').reset();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.error);
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al crear el activo');
+    }
+});
+
+function verActivo(codigo) {
+    window.open(`/activo/${codigo}`, '_blank');
+}
+
+function generarQR(id) {
+    window.open(`/api/activos/${id}/qr`, '_blank');
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+</script>
+{% endblock %}
